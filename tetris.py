@@ -127,3 +127,79 @@ class Board(QFrame):
         self.update()
 
 
+    #IMPLEMENTACIÓN DE QT:
+
+    # se emplea QPainter que es el responsable a un bajo nivel de dibujar en PyQt5.
+    #se va a emplear para dibujar todas als posibles figuras del tetris
+    def paintEvent(self, event):
+
+        painter = QPainter(self)
+        rect = self.contentsRect()
+
+        boardTop = rect.bottom() - Board.BoardHeight * self.squareHeight()
+
+
+        # este proceso lo podemos dividir en dos acciones
+        #primero se esbozarán los contornos de las figuras, en el caso de que no hayan sido ya definidas antes
+        # en el caso de los cuadrados, las recordamos pero no las definimos porque ya lo hemos hecho antes
+        for i in range(Board.BoardHeight):
+            for j in range(Board.BoardWidth):
+                shape = self.shapeAt(j, Board.BoardHeight - i - 1)
+
+                if shape != Tetrominoe.NoShape:
+                    self.drawSquare(painter,
+                                    rect.left() + j * self.squareWidth(),
+                                    boardTop + i * self.squareHeight(), shape)
+
+        if self.curPiece.shape() != Tetrominoe.NoShape:
+            for i in range(4):
+                x = self.curX + self.curPiece.x(i)
+                y = self.curY - self.curPiece.y(i)
+                self.drawSquare(painter, rect.left() + x * self.squareWidth(),
+                                boardTop + (Board.BoardHeight - y - 1) * self.squareHeight(),
+                                self.curPiece.shape())
+
+    #ahora tenemmos que dibujar la pieza excta que va cayendo por el tablero
+    def keyPressEvent(self, event):
+
+        if not self.isStarted or self.curPiece.shape() == Tetrominoe.NoShape:
+            super(Board, self).keyPressEvent(event)
+            return
+
+        key = event.key()
+
+        # en esta sección se definen las funciones que tienen cada tecla del teclado para poder jugar
+        if key == Qt.Key_P:
+            self.pause()
+            return
+
+        if self.isPaused:
+            return
+
+        elif key == Qt.Key_Left:
+            self.tryMove(self.curPiece, self.curX - 1, self.curY)
+
+        #a la derecha
+        elif key == Qt.Key_Right:
+            self.tryMove(self.curPiece, self.curX + 1, self.curY)
+
+        #a la derecha
+        elif key == Qt.Key_Down:
+            self.tryMove(self.curPiece.rotateRight(), self.curX, self.curY)
+
+        #a la izquierda
+        elif key == Qt.Key_Up:
+            self.tryMove(self.curPiece.rotateLeft(), self.curX, self.curY)
+
+        #con el espacio se va abajo directamente
+        elif key == Qt.Key_Space:
+            self.dropDown()
+
+        #presionando la d, bajara la pieza un solo bloque (agiliza la caída de una forma no brusca)
+        elif key == Qt.Key_D:
+            self.oneLineDown()
+
+        else:
+            super(Board, self).keyPressEvent(event)
+
+
