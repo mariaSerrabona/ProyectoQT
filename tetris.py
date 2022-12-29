@@ -92,3 +92,38 @@ class Board(QFrame):
     def squareHeight(self):
         return self.contentsRect().height() // Board.BoardHeight
 
+    #se empieza el juego
+    def start(self):
+        #se para, se llama a la función de abajo
+        if self.isPaused:
+            return
+        #se empieza si no está pausado
+        self.isStarted = True
+        self.isWaitingAfterLine = False
+        self.numLinesRemoved = 0
+        self.clearBoard()
+
+        self.msg2Statusbar.emit(str(self.numLinesRemoved))
+
+        self.newPiece()
+        self.timer.start(Board.Speed, self)
+
+    #acción de pausar el juego
+    def pause(self):
+        #Cuado se para, se puede inciar el juego de nuevo.
+        if not self.isStarted:
+            return
+
+        self.isPaused = not self.isPaused
+
+        if self.isPaused:
+            self.timer.stop()
+            self.msg2Statusbar.emit("paused")
+
+        else:
+            self.timer.start(Board.Speed, self)
+            self.msg2Statusbar.emit(str(self.numLinesRemoved))
+
+        self.update()
+
+
