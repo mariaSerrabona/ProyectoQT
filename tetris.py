@@ -203,3 +203,165 @@ class Board(QFrame):
             super(Board, self).keyPressEvent(event)
 
 
+    def timerEvent(self, event):
+        """handles timer event"""
+
+        if event.timerId() == self.timer.timerId():
+
+            if self.isWaitingAfterLine:
+                self.isWaitingAfterLine = False
+                self.newPiece()
+            else:
+                self.oneLineDown()
+
+        else:
+            super(Board, self).timerEvent(event)
+
+    def clearBoard(self):
+        """clears shapes from the board"""
+
+        for i in range(Board.BoardHeight * Board.BoardWidth):
+            self.board.append(Tetrominoe.NoShape)
+
+    def dropDown(self):
+        """drops down a shape"""
+
+        newY = self.curY
+
+        while newY > 0:
+
+            if not self.tryMove(self.curPiece, self.curX, newY - 1):
+                break
+
+            newY -= 1
+
+        self.pieceDropped()
+
+    #con esta funció se genera una nueva pieza cuando la actual ya está abajo
+    def oneLineDown(self):
+        if not self.tryMove(self.curPiece, self.curX, self.curY - 1):
+            self.pieceDropped()
+
+    #cada vez que una pieza cae, se comprueba si hay alguna linea completa para eliminarla
+    def pieceDropped(self):
+        for i in range(4):
+            x = self.curX + self.curPiece.x(i)
+            y = self.curY - self.curPiece.y(i)
+            self.setShapeAt(x, y, self.curPiece.shape())
+        #si se puede, se elimina una linea completa
+        self.removeFullLines()
+        #si no, generamos una nueva pieza
+        if not self.isWaitingAfterLine:
+            self.newPiece()
+
+    #función llamada en otras funciones para poder eliminar lineas completas
+    def removeFullLines(self):
+        numFullLines = 0
+        rowsToRemove = []
+
+        for i in range(Board.BoardHeight):
+            n = 0
+            for j in range(Board.BoardWidth):
+                if not self.shapeAt(j, i) == Tetrominoe.NoShape:
+                    n = n + 1
+
+            if n == 10:
+                rowsToRemove.append(i)
+
+        rowsToRemove.reverse()
+
+        for m in rowsToRemove:
+
+            for k in range(m, Board.BoardHeight):
+                for l in range(Board.BoardWidth):
+                    self.setShapeAt(l, k, self.shapeAt(l, k + 1))
+
+        numFullLines = numFullLines + len(rowsToRemove)
+        #además, con cada línea completa eliminada es un punto más en nuestra partida
+        if numFullLines > 0:
+            self.numLinesRemoved = self.numLinesRemoved + numFullLines
+            self.msg2Statusbar.emit(str(self.numLinesRemoved))
+
+            self.isWaitingAfterLine = True
+            self.curPiece.setShape(Tetrominoe.NoShape)
+            self.update()
+
+    #función llamada en otras funciones para poder generar una nueva pieza aleatoria.
+    def newPiece(self):
+        self.curPiece = Shape()
+        self.curPiece.setRandomShape()
+        self.curX = Board.BoardWidth // 2 + 1
+        self.curY = Board.BoardHeight - 1 + self.curPiece.minY()
+
+        if not self.tryMove(self.curPiece, self.curX, self.curY):
+            self.curPiece.setShape(Tetrominoe.NoShape)
+            self.timer.stop()
+            self.isStarted = False
+            #si ya no se pueden generar más piezas porque no caben, se acaba el juego
+            self.msg2Statusbar.emit("Has perdido!")
+
+
+    #se intentan mover las piezas, se retorna TRUE en el caso de que la pieza se pueda ubicar en el sitio seleccionado
+    def tryMove(self, newPiece, newX, newY):
+        for i in range(4):
+            x = newX + newPiece.x(i)
+            y = newY - newPiece.y(i)
+
+            if x < 0 or x >= Board.BoardWidth or y < 0 or y >= Board.BoardHeight:
+                return False
+
+            if self.shapeAt(x, y) != Tetrominoe.NoShape:
+                return False
+
+        self.curPiece = newPiece
+        self.curX = newX
+        self.curY = newY
+        self.update()
+
+        return True
+
+    #función de estilos de las figuras
+    def drawSquare(self, painter, x, y, shape):
+            """draws a square of a shape"""
+
+        colorTable = [0x000000, 0xCC6666, 0x66CC66, 0x6666CC,
+                    0xCCCC66, 0xCC66CC, 0x66CCCC, 0xDAAA00]
+
+        color = QColor(colorTable[shape])
+        painter.fillRect(x + 1, y + 1, self.squareWidth() - 2,
+                        self.squareHeight() - 2, color)
+
+        painter.setPen(color.lighter())
+        painter.drawLine(x, y + self.squareHeight() - 1, x, y)
+        painter.drawLine(x, y, x + self.squareWidth() - 1, y)
+
+        painter.setPen(color.darker())
+        painter.drawLine(x + 1, y + self.squareHeight() - 1,
+                        x + self.squareWidth() - 1, y + self.squareHeight() - 1)
+        painter.drawLine(x + self.squareWidth() - 1,
+                        y + self.squareHeight() - 1, x + self.squareWidth() - 1, y + 1)
+
+
+#clase encargada de tener todos los espacios que ocupa cada pieza.
+class Tetrominoe(object):
+    NoShape = 0
+    ZShape = 1
+    SShape = 2
+    LineShape = 3
+    TShape = 4
+    SquareShape = 5
+    LShape = 6
+    MirroredLShape = 7
+
+#información de todas las posibles piezas del tetris
+class Shape(object):
+    coordsTable = (
+        ((0, 0), (0, 0), (0, 0), (0, 0)),
+        ((0, -1), (0, 0), (-1, 0), (-1, 1)),
+        ((0, -1), (0, 0), (1, 0), (1, 1)),
+        ((0, -1), (0, 0), (0, 1), (0, 2)),
+        ((-1, 0), (0, 0), (1, 0), (0, 1)),
+        ((0, 0), (1, 0), (0, 1), (1, 1)),
+        ((-1, -1), (0, -1), (0, 0), (0, 1)),
+        ((1, -1), (0, -1), (0, 0), (0, 1))
+    )
